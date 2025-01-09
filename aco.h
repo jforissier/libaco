@@ -46,6 +46,9 @@ extern "C" {
     #define ACO_REG_IDX_SP 5
     #define ACO_REG_IDX_BP 7
     #define ACO_REG_IDX_FPU 8
+#elif __aarch64__
+    #define ACO_REG_IDX_RETADDR 0
+    #define ACO_REG_IDX_SP 1
 #else
     #error "platform no support yet"
 #endif
@@ -58,7 +61,7 @@ typedef struct {
     size_t max_cpsz;
     // copy from share stack to this save stack
     size_t ct_save;
-    // copy from this save stack to share stack 
+    // copy from this save stack to share stack
     size_t ct_restore;
 } aco_save_stack_t;
 
@@ -66,7 +69,7 @@ struct aco_s;
 typedef struct aco_s aco_t;
 
 typedef struct {
-    void*  ptr;            
+    void*  ptr;
     size_t sz;
     void*  align_highptr;
     void*  align_retptr;
@@ -99,6 +102,8 @@ struct aco_s{
     #else
         void*  reg[9];
     #endif
+#elif __aarch64__
+	void *reg[14];  // pc, sp, x19-x29, x30 (lr)
 #else
     #error "platform no support yet"
 #endif
@@ -107,7 +112,7 @@ struct aco_s{
     char   is_end;
 
     aco_cofuncp_t fp;
-    
+
     aco_save_stack_t  save_stack;
     aco_share_stack_t* share_stack;
 };
@@ -161,7 +166,9 @@ extern void aco_thread_init(aco_cofuncp_t last_word_co_fp);
 
 extern void* acosw(aco_t* from_co, aco_t* to_co) __asm__("acosw"); // asm
 
+#ifndef __aarch64__
 extern void aco_save_fpucw_mxcsr(void* p) __asm__("aco_save_fpucw_mxcsr");  // asm
+#endif
 
 extern void aco_funcp_protector_asm(void) __asm__("aco_funcp_protector_asm"); // asm
 
@@ -180,24 +187,34 @@ extern aco_t* aco_create(
         aco_cofuncp_t fp, void* arg
     );
 
+#if defined(__i386__) || defined(__x86_64__)
+#define ACO_THREAD __thread
+#else
+#define ACO_THREAD
+#endif
+
 // aco's Global Thread Local Storage variable `co`
-extern __thread aco_t* aco_gtls_co;
+extern ACO_THREAD aco_t* aco_gtls_co;
 
 aco_attr_no_asan
 extern void aco_resume(aco_t* resume_co);
 
-//extern void aco_yield1(aco_t* yield_co);
-#define aco_yield1(yield_co) do {             \
-    aco_assertptr((yield_co));                    \
-    aco_assertptr((yield_co)->main_co);           \
-    acosw((yield_co), (yield_co)->main_co);   \
-} while(0)
+static inline void aco_yield1(aco_t *yield_co)
+{
+    aco_assertptr(yield_co);
+    aco_assertptr(yield_co->main_co);
+    acosw(yield_co, yield_co->main_co);
+}
 
-#define aco_yield() do {        \
-    aco_yield1(aco_gtls_co);    \
-} while(0)
+static inline void aco_yield(void)
+{
+	aco_yield1(aco_gtls_co);
+}
 
-#define aco_get_arg() (aco_gtls_co->arg)
+static inline void *aco_get_arg()
+{
+	return aco_gtls_co->arg;
+}
 
 #define aco_get_co() ({(void)0; aco_gtls_co;})
 
@@ -207,18 +224,20 @@ extern void aco_destroy(aco_t* co);
 
 #define aco_is_main_co(co) ({((co)->main_co) == NULL;})
 
-#define aco_exit1(co) do {     \
-    (co)->is_end = 1;           \
-    aco_assert((co)->share_stack->owner == (co)); \
-    (co)->share_stack->owner = NULL; \
-    (co)->share_stack->align_validsz = 0; \
-    aco_yield1((co));            \
-    aco_assert(0);                  \
-} while(0)
+static inline void aco_exit1(aco_t *co)
+{
+    co->is_end = 1;
+    aco_assert(co->share_stack->owner == co);
+    co->share_stack->owner = NULL;
+    co->share_stack->align_validsz = 0;
+    aco_yield1(co);
+    aco_assert(0);
+}
 
-#define aco_exit() do {       \
-    aco_exit1(aco_gtls_co); \
-} while(0)
+static inline void aco_exit(void)
+{
+	aco_exit1(aco_gtls_co);
+}
 
 #ifdef __cplusplus
 }
