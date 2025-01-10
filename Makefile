@@ -11,6 +11,16 @@ app_list=test_aco_tutorial_0 test_aco_tutorial_1 test_aco_tutorial_2 test_aco_tu
 
 all:
 
+example: aco.c example.c acosw.S aco.h
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) aco.c example.c acosw.S -o example
+
+clean-example:
+	rm -f example
+
+all: example
+
+clean: clean-example
+
 # $1 = binary name
 # $2 = extra CFLAGS
 # $3 = binary suffix
