@@ -14,12 +14,11 @@
 
 #define _GNU_SOURCE
 
-#include "aco.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 
-// this header including should be at the last of the `include` directives list
-#include "aco_assert_override.h"
+#include "aco.h"
 
 void aco_runtime_test(void){
 #ifdef __i386__
@@ -37,7 +36,7 @@ void aco_runtime_test(void){
     assert(sizeof(int) <= sizeof(size_t));
 }
 
-// assertptr(dst); assertptr(src);
+// assert(dst); assert(src);
 // assert((((uintptr_t)(src) & 0x0f) == 0) && (((uintptr_t)(dst) & 0x0f) == 0));
 // assert((((sz) & 0x0f) == 0x08) && (((sz) >> 4) >= 0) && (((sz) >> 4) <= 8));
 // sz = 16*n + 8 ( 0 <= n <= 8)
@@ -249,14 +248,14 @@ aco_share_stack_t* aco_share_stack_new2(size_t sz, char guard_page_enabled){
     }
 
     aco_share_stack_t* p = (aco_share_stack_t*)malloc(sizeof(aco_share_stack_t));
-    assertalloc_ptr(p);
+    assert(p);
     memset(p, 0, sizeof(aco_share_stack_t));
 
     if(guard_page_enabled != 0){
         p->real_ptr = mmap(
             NULL, sz, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0
         );
-        assertalloc_bool(p->real_ptr != MAP_FAILED);
+        assert(p->real_ptr != MAP_FAILED);
         p->guard_page_enabled = 1;
         assert(0 == mprotect(p->real_ptr, u_pgsz, PROT_READ));
 
@@ -268,7 +267,7 @@ aco_share_stack_t* aco_share_stack_new2(size_t sz, char guard_page_enabled){
         //p->guard_page_enabled = 0;
         p->sz = sz;
         p->ptr = malloc(sz);
-        assertalloc_ptr(p->ptr);
+        assert(p->ptr);
     }
 
     p->owner = NULL;
@@ -313,11 +312,11 @@ aco_t* aco_create(
     ){
 
     aco_t* p = (aco_t*)malloc(sizeof(aco_t));
-    assertalloc_ptr(p);
+    assert(p);
     memset(p, 0, sizeof(aco_t));
 
     if(main_co != NULL){ // non-main co
-        assertptr(share_stack);
+        assert(share_stack);
         p->share_stack = share_stack;
 #ifdef __i386__
         // POSIX.1-2008 (IEEE Std 1003.1-2008) - General Information - Data Types - Pointer Types
@@ -349,7 +348,7 @@ aco_t* aco_create(
             save_stack_sz = 64;
         }
         p->save_stack.ptr = malloc(save_stack_sz);
-        assertalloc_ptr(p->save_stack.ptr);
+        assert(p->save_stack.ptr);
         p->save_stack.sz = save_stack_sz;
 #if defined(__i386__) || defined(__x86_64__) || defined(__aarch64__)
         p->save_stack.valid_sz = 0;
@@ -408,7 +407,7 @@ void aco_resume(aco_t* resume_co){
                     }
                 }
                 owner_co->save_stack.ptr = malloc(owner_co->save_stack.sz);
-                assertalloc_ptr(owner_co->save_stack.ptr);
+                assert(owner_co->save_stack.ptr);
             }
             // TODO: optimize the performance penalty of memcpy function call
             //   for very short memory span
@@ -485,7 +484,7 @@ void aco_resume(aco_t* resume_co){
 }
 
 void aco_destroy(aco_t* co){
-    assertptr(co);
+    assert(co);
     if(aco_is_main_co(co)){
         free(co);
     } else {
