@@ -4,7 +4,9 @@ ifneq (,$(CROSS_COMPILE))
 CC=$(CROSS_COMPILE)gcc
 endif
 
-all:
+all: example
+
+clean: clean-example
 
 example: aco.c example.c acosw.S aco.h
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) aco.c example.c acosw.S -o example
@@ -12,6 +14,12 @@ example: aco.c example.c acosw.S aco.h
 clean-example:
 	rm -f example
 
-all: example
+cscope:
+	rm -f cscope.*
+	find . -name "*.[chSs]" > cscope.files
+	cscope -b -q -k
 
-clean: clean-example
+cscope-clean:
+	rm -f cscope.*
+
+distclean: clean cscope-clean
